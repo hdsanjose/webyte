@@ -5,11 +5,10 @@ $password = getenv('MYSQLPASSWORD') ?: "";
 $dbname = getenv('MYSQLDATABASE') ?: "webyte";
 $port = getenv('MYSQLPORT') ?: 3306;
 
-$conn = new mysqli($host, $user, $password, $dbname, $port);
-
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+try {
+    $conn = new PDO("mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4", $user, $password);
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch(PDOException $e) {
+    die("Connection failed: " . $e->getMessage());
 }
-
-$conn->set_charset("utf8");
 ?>
