@@ -296,7 +296,7 @@ session_start();
                 <div class="centered-block" style="margin-top: 6px;">
                     <span class="section-label">A project of</span>
                     <div class="team-badge-box">GROUP 8 | WE BYTE</div>
-                    <span class="section-label">in collective efforts of</span>
+                    <span class="section-label">through the collective efforts of</span>
                 </div>
 
                 <div class="members-list" style="margin-top: 8px;">
