@@ -301,27 +301,27 @@ session_start();
 
                 <div class="members-list" style="margin-top: 8px;">
                     <div class="member-row">
-                        <span class="member-name">Jan Micah V. Molines</span>
+                        <span class="member-name">Molines, Jan Micah, Valenciano</span>
                         <span class="member-role">Front-end Developer</span>
                     </div>
                     <div class="member-row">
-                        <span class="member-name">Jolo Nicko O. Palileo</span>
+                        <span class="member-name">Palileo, Jolo Nicko, Ocenar</span>
                         <span class="member-role">Front-end Developer</span>
                     </div>
                     <div class="member-row">
-                        <span class="member-name">Sai Gabriele R. Moroña</span>
+                        <span class="member-name">Moroña, Sai Gabriele, Ranay</span>
                         <span class="member-role">Database Developer and Manager</span>
                     </div>
                     <div class="member-row">
-                        <span class="member-name">Mark Lourence T. Patlonag</span>
+                        <span class="member-name">Patlonag, Mark Lourence, Tante</span>
                         <span class="member-role">Back-end Developer</span>
                     </div>
                     <div class="member-row">
-                        <span class="member-name">Lyzamae B. Montes</span>
+                        <span class="member-name">Montes, Lyzamae, Banaag</span>
                         <span class="member-role">Process Manager</span>
                     </div>
                     <div class="member-row">
-                        <span class="member-name">Hanz Darwin R. San Jose</span>
+                        <span class="member-name">San Jose, Hanz Darwin, Rellora</span>
                         <span class="member-role">Project Manager</span>
                     </div>
                 </div>
