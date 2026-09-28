@@ -1061,12 +1061,21 @@ $enrolled_result = $stmt_enrolled->get_result();
             statusMsg.innerText = 'Processing your attendance...';
             statusMsg.style.display = 'block';
 
+            // Kunin ang oras sa mismong device ng user (Format: YYYY-MM-DD HH:MM:SS)
+            const now = new Date();
+            const deviceTime = now.getFullYear() + '-' + 
+                String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+                String(now.getDate()).padStart(2, '0') + ' ' + 
+                String(now.getHours()).padStart(2, '0') + ':' + 
+                String(now.getMinutes()).padStart(2, '0') + ':' + 
+                String(now.getSeconds()).padStart(2, '0');
+
             fetch('process_qr.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: 'qr_data=' + encodeURIComponent(decodedText)
+                body: 'qr_data=' + encodeURIComponent(decodedText) + '&device_time=' + encodeURIComponent(deviceTime)
             })
             .then(response => response.json())
             .then(data => {
