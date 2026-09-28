@@ -44,7 +44,6 @@ if (!$subject) {
             min-height: 100vh;
         }
 
-        /* Sidebar Styling (Matched to Dashboard green shade #0d8a00) */
         .sidebar {
             width: 300px;
             background: #0d8a00;
@@ -144,7 +143,6 @@ if (!$subject) {
             opacity: 0.8;
         }
 
-        /* Main Content Area */
         .main-content {
             margin-left: 300px;
             flex: 1;
@@ -238,6 +236,7 @@ if (!$subject) {
                     <thead>
                         <tr>
                             <th>Petsa (Date)</th>
+                            <th>Oras ng Pag-generate ng QR</th>
                             <th>Oras ng Pag-scan (Scan Time)</th>
                             <th>Remarks (Status)</th>
                         </tr>
@@ -245,7 +244,7 @@ if (!$subject) {
                     <tbody>
                         <?php
                         $stmt = $conn->prepare("
-                            SELECT scanned_at, status 
+                            SELECT scanned_at, qr_generated_at, status 
                             FROM attendance 
                             WHERE student_id = ? AND subject_id = ?
                             ORDER BY scanned_at DESC
@@ -257,9 +256,11 @@ if (!$subject) {
                         if ($result->num_rows > 0) {
                             while ($row = $result->fetch_assoc()) {
                                 $scan_time = strtotime($row['scanned_at']);
+                                $qr_gen_time = !empty($row['qr_generated_at']) ? strtotime($row['qr_generated_at']) : null;
                                 
                                 $date_formatted = date('F d, Y', $scan_time);
                                 $time_formatted = date('h:i:s A', $scan_time);
+                                $qr_gen_formatted = $qr_gen_time ? date('h:i:s A', $qr_gen_time) : 'N/A';
 
                                 $status = trim($row['status']);
                                 if (strcasecmp($status, 'Present') === 0) {
@@ -272,12 +273,13 @@ if (!$subject) {
 
                                 echo "<tr>
                                     <td>{$date_formatted}</td>
+                                    <td>{$qr_gen_formatted}</td>
                                     <td>{$time_formatted}</td>
                                     <td>{$remark}</td>
                                 </tr>";
                             }
                         } else {
-                            echo "<tr><td colspan='3' style='text-align: center; color: #888; padding: 40px; font-style: italic;'>Wala pang record ng attendance sa subject na ito.</td></tr>";
+                            echo "<tr><td colspan='4' style='text-align: center; color: #888; padding: 40px; font-style: italic;'>Wala pang record ng attendance sa subject na ito.</td></tr>";
                         }
                         $stmt->close();
                         ?>
