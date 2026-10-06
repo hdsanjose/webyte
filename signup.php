@@ -340,7 +340,7 @@ while ($row = $taken_res->fetch_assoc()) {
                     <label>KLD Email</label>
                     <div class="input-with-icon">
                         <i class="fa-solid fa-envelope"></i>
-                        <input type="email" name="email" id="emailInput" class="form-control" placeholder="e.g., jdelacruz@kld.edu.ph" required disabled oninput="checkFormProgression()">
+                        <input type="email" name="email" id="emailInput" class="form-control" placeholder="e.g., hdsanjose@kld.edu.ph" required disabled oninput="checkFormProgression()">
                     </div>
                 </div>
 
