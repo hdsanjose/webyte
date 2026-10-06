@@ -793,6 +793,10 @@ $enrolled_result = $stmt_enrolled->get_result();
             border: 2px solid #eef2f0;
         }
 
+          #qr-reader video {
+            transform: scaleX(-1);
+        }
+        
         #qr-status-msg {
             margin-top: 15px;
             font-size: 13.5px;
