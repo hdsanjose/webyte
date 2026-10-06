@@ -292,7 +292,7 @@ while ($row = $taken_res->fetch_assoc()) {
                     <label>First Name</label>
                     <div class="input-with-icon">
                         <i class="fa-solid fa-user"></i>
-                        <input type="text" name="first_name" id="firstName" class="form-control" placeholder="e.g., Amie" required oninput="checkFormProgression()">
+                        <input type="text" name="first_name" id="firstName" class="form-control" placeholder="e.g., Hanz Darwin" required oninput="checkFormProgression()">
                     </div>
                 </div>
 
@@ -300,7 +300,7 @@ while ($row = $taken_res->fetch_assoc()) {
                     <label>Middle Name</label>
                     <div class="input-with-icon">
                         <i class="fa-solid fa-user"></i>
-                        <input type="text" name="middle_name" id="middleName" class="form-control" placeholder="e.g., Inguito" disabled oninput="checkFormProgression()">
+                        <input type="text" name="middle_name" id="middleName" class="form-control" placeholder="e.g., Rellora" disabled oninput="checkFormProgression()">
                     </div>
                 </div>
 
@@ -308,7 +308,7 @@ while ($row = $taken_res->fetch_assoc()) {
                     <label>Last Name</label>
                     <div class="input-with-icon">
                         <i class="fa-solid fa-user"></i>
-                        <input type="text" name="last_name" id="lastName" class="form-control" placeholder="e.g., Samonte" required disabled oninput="checkFormProgression()">
+                        <input type="text" name="last_name" id="lastName" class="form-control" placeholder="e.g., San Jose" required disabled oninput="checkFormProgression()">
                     </div>
                 </div>
 
