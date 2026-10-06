@@ -1001,21 +1001,38 @@ $enrolled_result = $stmt_enrolled->get_result();
 
         let html5QrcodeScanner = null;
 
-        function openQRModal() {
+       function openQRModal() {
             document.getElementById('qrModal').style.display = 'flex';
             document.getElementById('qr-status-msg').style.display = 'none';
 
-            html5QrcodeScanner = new Html5QrcodeScanner(
-                "qr-reader", 
-                { fps: 10, qrbox: { width: 220, height: 220 } },
-                false
-            );
-            html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+            // Gamitin ang Html5Qrcode para direktang mapili ang back camera
+            html5QrcodeScanner = new Html5Qrcode("qr-reader");
+            
+            const config = { fps: 10, qrbox: { width: 220, height: 220 } };
+            
+            // facingMode: "environment" ang nagtatakda para sa back camera
+            html5QrcodeScanner.start(
+                { facingMode: "environment" }, 
+                config, 
+                onScanSuccess, 
+                onScanFailure
+            ).catch(err => {
+                console.error("Error starting QR scanner:", err);
+                // Fallback kung sakaling magka-issue sa back camera
+                const statusMsg = document.getElementById('qr-status-msg');
+                statusMsg.className = 'status-error';
+                statusMsg.innerText = 'Unable to access back camera. Please check permissions.';
+                statusMsg.style.display = 'block';
+            });
         }
 
         function closeQRModal() {
             if (html5QrcodeScanner) {
-                html5QrcodeScanner.clear().catch(err => console.error("Error clearing QR scanner:", err));
+                html5QrcodeScanner.stop().then(() => {
+                    html5QrcodeScanner.clear();
+                }).catch(err => {
+                    console.error("Failed to stop QR scanner.", err);
+                });
             }
             document.getElementById('qrModal').style.display = 'none';
         }
