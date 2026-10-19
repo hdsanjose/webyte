@@ -9,42 +9,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $last_name = trim($_POST['last_name']);
     $id_number = trim($_POST['id_number']);
     $email = trim($_POST['email']);
-    $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
-    $role = $_POST['role'];
+    $password = $_POST['password'];
+    $role = 'student'; // Strictly student role
     
-    $sec_val = isset($_POST['student_section']) ? trim($_POST['student_section']) : '';
-    $student_section = ($role === 'student') ? trim($sec_val) : null;
+    $student_section = isset($_POST['student_section']) ? trim($_POST['student_section']) : '';
 
-    $inst_val = isset($_POST['teacher_institute']) ? trim($_POST['teacher_institute']) : '';
-    $teacher_institute = ($role === 'faculty') ? trim($inst_val) : null;
-
-    $pos_val = isset($_POST['teacher_position']) ? trim($_POST['teacher_position']) : '';
-    $teacher_position = ($role === 'faculty') ? trim($pos_val) : null;
-
-    $profile_pic = 'kld-logo.png';
-    if (isset($_FILES['profile_pic']) && $_FILES['profile_pic']['error'] === UPLOAD_ERR_OK) {
-        $file_tmp = $_FILES['profile_pic']['tmp_name'];
-        $file_name = time() . '_' . basename($_FILES['profile_pic']['name']);
-        $upload_dir = 'uploads/';
-        
-        if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0777, true);
-        }
-        
-        $target_path = $upload_dir . $file_name;
-        if (move_uploaded_file($file_tmp, $target_path)) {
-            $profile_pic = $target_path;
-        }
-    }
-
-    $stmt = $conn->prepare("INSERT INTO users (first_name, middle_name, last_name, id_number, email, password, role, section, institute, position, profile_pic) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("sssssssssss", $first_name, $middle_name, $last_name, $id_number, $email, $password, $role, $student_section, $teacher_institute, $teacher_position, $profile_pic);
-    
-    if ($stmt->execute()) {
-        header("Location: login.php");
-        exit();
+    // Server-side Validations
+    if (!preg_match('/^[A-ZÑa-zñ\-\s]+$/', $first_name) || !preg_match('/^[A-ZÑa-zñ\-\s]+$/', $last_name)) {
+        $error = "Names must contain only letters, spaces, and hyphens.";
+    } elseif (!preg_match('/^\d{4}-\d{2}-\d{6}$/', $id_number)) {
+        $error = "The identification number must strictly follow the format: 202X-XX-XXXXXX.";
+    } elseif (!preg_match('/^[a-zA-Z0-9._%+-]+@kld\.edu\.ph$/', $email)) {
+        $error = "Only official KLD institutional email addresses (@kld.edu.ph) are accepted.";
+    } elseif (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,16}$/', $password)) {
+        $error = "The password must be between 8 and 16 characters long and include uppercase letters, lowercase letters, numbers, and special characters.";
+    } elseif (!isset($_POST['privacy_policy'])) {
+        $error = "You must agree to the data privacy policy.";
     } else {
-        $error = "Registration failed. ID number or email may already be in use.";
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+        $profile_pic = 'kld-logo.png';
+        
+        if (isset($_FILES['profile_pic']) && $_FILES['profile_pic']['error'] === UPLOAD_ERR_OK) {
+            $file_tmp = $_FILES['profile_pic']['tmp_name'];
+            $file_name = time() . '_' . basename($_FILES['profile_pic']['name']);
+            $upload_dir = 'uploads/';
+            
+            if (!is_dir($upload_dir)) {
+                mkdir($upload_dir, 0777, true);
+            }
+            
+            $target_path = $upload_dir . $file_name;
+            if (move_uploaded_file($file_tmp, $target_path)) {
+                $profile_pic = $target_path;
+            }
+        }
+
+        // Updated query to insert only student-specific fields
+        $stmt = $conn->prepare("INSERT INTO users (first_name, middle_name, last_name, id_number, email, password, role, section, profile_pic) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("sssssssss", $first_name, $middle_name, $last_name, $id_number, $email, $hashed_password, $role, $student_section, $profile_pic);
+        
+        if ($stmt->execute()) {
+            header("Location: login.php");
+            exit();
+        } else {
+            $error = "Registration failed. The identification number or email address may already be in use.";
+        }
     }
 }
 
@@ -56,20 +65,6 @@ $sections_result = $conn->query($sections_query);
 $sections_data = [];
 while ($row = $sections_result->fetch_assoc()) {
     $sections_data[] = $row;
-}
-
-$institutes_query = "SELECT id, institute_name FROM institutes ORDER BY institute_name ASC";
-$institutes_result = $conn->query($institutes_query);
-$institutes_data = [];
-while ($row = $institutes_result->fetch_assoc()) {
-    $institutes_data[] = $row;
-}
-
-$taken_positions_query = "SELECT institute, position FROM users WHERE role = 'faculty' AND position IN ('Institute Dean', 'Institute Associate Dean')";
-$taken_res = $conn->query($taken_positions_query);
-$taken_positions = [];
-while ($row = $taken_res->fetch_assoc()) {
-    $taken_positions[$row['institute']][] = $row['position'];
 }
 ?>
 
@@ -174,40 +169,27 @@ while ($row = $taken_res->fetch_assoc()) {
             box-shadow: 0 0 0 3px rgba(16, 138, 0, 0.1);
             outline: none;
         }
-        .form-control:disabled {
-            background-color: #f1f3f2;
-            cursor: not-allowed;
-            opacity: 0.7;
-        }
-        .role-buttons-group {
+        .checkbox-group {
             display: flex;
-            gap: 10px;
-        }
-        .role-btn {
-            flex: 1;
-            padding: 12px 10px;
-            background: #f8faf9;
-            border: 1px solid #ddd;
-            border-radius: 10px;
-            font-size: 13px;
-            font-weight: 700;
-            color: #555;
-            cursor: pointer;
-            text-align: center;
-            display: flex;
-            flex-direction: column;
             align-items: center;
-            gap: 5px;
+            gap: 10px;
+            margin: 20px 0;
+            font-size: 13px;
+            color: #444;
         }
-        .role-btn.active {
-            background: #108a00;
-            color: #ffffff;
-            border-color: #108a00;
+        .checkbox-group input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: #108a00;
+            cursor: pointer;
         }
-        .role-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            background-color: #f1f3f2;
+        .checkbox-group a {
+            color: #108a00;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .checkbox-group a:hover {
+            text-decoration: underline;
         }
         .btn-submit {
             background: #108a00;
@@ -219,11 +201,7 @@ while ($row = $taken_res->fetch_assoc()) {
             font-weight: 700;
             border-radius: 12px;
             cursor: pointer;
-            margin-top: 10px;
-        }
-        .btn-submit:disabled {
-            background: #ccc;
-            cursor: not-allowed;
+            margin-top: 5px;
         }
         .error-msg {
             background: #ffebee;
@@ -233,6 +211,13 @@ while ($row = $taken_res->fetch_assoc()) {
             font-size: 13px;
             margin-bottom: 15px;
             text-align: center;
+            font-weight: 600;
+        }
+        .field-alert {
+            color: #c62828;
+            font-size: 11px;
+            margin-top: 4px;
+            display: none;
             font-weight: 600;
         }
         .login-link {
@@ -264,9 +249,9 @@ while ($row = $taken_res->fetch_assoc()) {
         </div>
         <div class="nav-links">
             <a href="index.php"><i class="fa-solid fa-house"></i> Home</a>
-            <a href="about.php"><i class="fa-solid fa-circle-info"></i> About us</a>
-            <a href="signup.php" class="active"><i class="fa-solid fa-user-plus"></i> Sign-up</a>
-            <a href="login.php"><i class="fa-solid fa-right-to-bracket"></i> Log-in</a>
+            <a href="about.php"><i class="fa-solid fa-circle-info"></i> About Us</a>
+            <a href="signup.php" class="active"><i class="fa-solid fa-user-plus"></i> Sign Up</a>
+            <a href="login.php"><i class="fa-solid fa-right-to-bracket"></i> Log In</a>
         </div>
     </nav>
 
@@ -274,15 +259,18 @@ while ($row = $taken_res->fetch_assoc()) {
         <div class="signup-card">
             <div class="signup-header">
                 <img src="kld-logo.png" alt="KLD Logo" style="width: 55px; height: 55px; object-fit: contain; margin-bottom: 5px;">
-                <h2>Registration</h2>
-                <p>Register your KLD Account</p>
+                <h2>Student Registration</h2>
+                <p>Register your KLD Student Account</p>
             </div>
 
             <?php if (!empty($error)): ?>
-                <div class="error-msg"><?php echo htmlspecialchars($error); ?></div>
+                <div class="error-msg" id="serverErrorMsg"><?php echo htmlspecialchars($error); ?></div>
             <?php endif; ?>
+            <div class="error-msg" id="clientErrorMsg" style="display: none;"></div>
 
-            <form action="signup.php" method="POST" enctype="multipart/form-data" id="signupForm">
+            <form action="signup.php" method="POST" enctype="multipart/form-data" id="signupForm" onsubmit="return validateFormOnSubmit(event)">
+                <input type="hidden" name="role" value="student">
+
                 <div class="form-group">
                     <label>Upload Profile Photo (Optional)</label>
                     <input type="file" name="profile_pic" class="form-control" accept="image/*">
@@ -292,174 +280,162 @@ while ($row = $taken_res->fetch_assoc()) {
                     <label>First Name</label>
                     <div class="input-with-icon">
                         <i class="fa-solid fa-user"></i>
-                        <input type="text" name="first_name" id="firstName" class="form-control" placeholder="e.g., Hanz Darwin" required oninput="checkFormProgression()">
+                        <input type="text" name="first_name" id="firstName" class="form-control" placeholder="e.g., Hanz Darwin" required onblur="validateFirstName(this)">
                     </div>
+                    <div class="field-alert" id="firstNameAlert">The name must contain only letters, spaces, and hyphens.</div>
                 </div>
 
                 <div class="form-group">
-                    <label>Middle Name</label>
+                    <label>Middle Name <span style="font-weight: normal; color: #666; font-size: 11px;">(Input "N/A" if none)</span></label>
                     <div class="input-with-icon">
                         <i class="fa-solid fa-user"></i>
-                        <input type="text" name="middle_name" id="middleName" class="form-control" placeholder="e.g., Rellora" disabled oninput="checkFormProgression()">
+                        <input type="text" name="middle_name" id="middleName" class="form-control" placeholder="e.g., Rellora" required onblur="validateMiddleName(this)">
                     </div>
+                    <div class="field-alert" id="middleNameAlert">The middle name must contain only letters, spaces, and hyphens (or "N/A").</div>
                 </div>
 
                 <div class="form-group">
                     <label>Last Name</label>
                     <div class="input-with-icon">
                         <i class="fa-solid fa-user"></i>
-                        <input type="text" name="last_name" id="lastName" class="form-control" placeholder="e.g., San Jose" required disabled oninput="checkFormProgression()">
+                        <input type="text" name="last_name" id="lastName" class="form-control" placeholder="e.g., San Jose" required onblur="validateLastName(this)">
                     </div>
+                    <div class="field-alert" id="lastNameAlert">The last name must contain only letters, spaces, and hyphens.</div>
                 </div>
 
                 <div class="form-group">
-                    <label>Role</label>
-                    <input type="hidden" name="role" id="roleInput" value="student" required>
-                    <div class="role-buttons-group">
-                        <button type="button" class="role-btn active" data-role="student" onclick="selectRole('student')" disabled>
-                            <i class="fa-solid fa-user-graduate"></i> Student
-                        </button>
-                        <button type="button" class="role-btn" data-role="faculty" onclick="selectRole('faculty')" disabled>
-                            <i class="fa-solid fa-chalkboard-user"></i> Teacher
-                        </button>
-                        <button type="button" class="role-btn" data-role="admin" onclick="selectRole('admin')" disabled>
-                            <i class="fa-solid fa-user-shield"></i> Admin
-                        </button>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label id="idNumberLabel">Student Number</label>
+                    <label>Student Number</label>
                     <div class="input-with-icon">
                         <i class="fa-solid fa-id-card"></i>
-                        <input type="text" name="id_number" id="idNumber" class="form-control" placeholder="202X-X-XXXXXX" required disabled oninput="checkFormProgression()">
+                        <input type="text" name="id_number" id="idNumber" class="form-control" placeholder="202X-XX-XXXXXX" maxlength="14" required onblur="validateIdNumber(this)">
                     </div>
+                    <div class="field-alert" id="idNumberAlert">The identification number must strictly follow the format: 202X-XX-XXXXXX.</div>
                 </div>
 
                 <div class="form-group">
                     <label>KLD Email</label>
                     <div class="input-with-icon">
                         <i class="fa-solid fa-envelope"></i>
-                        <input type="email" name="email" id="emailInput" class="form-control" placeholder="e.g., hdsanjose@kld.edu.ph" required disabled oninput="checkFormProgression()">
+                        <input type="email" name="email" id="emailInput" class="form-control" placeholder="e.g., hdsanjose@kld.edu.ph" required onblur="validateEmail(this)">
                     </div>
+                    <div class="field-alert" id="emailAlert">Please provide a valid and official KLD institutional email address (@kld.edu.ph).</div>
                 </div>
 
                 <div class="form-group">
                     <label>Password</label>
                     <div class="input-with-icon">
                         <i class="fa-solid fa-lock"></i>
-                        <input type="password" name="password" id="passwordInput" class="form-control" placeholder="••••••••" required disabled oninput="checkFormProgression()">
+                        <input type="password" name="password" id="passwordInput" class="form-control" placeholder="••••••••" minlength="8" maxlength="16" required onblur="validatePassword(this)">
                         <i class="fa-solid fa-eye password-toggle" id="togglePassword" onclick="togglePasswordVisibility('passwordInput', 'togglePassword')"></i>
                     </div>
+                    <div class="field-alert" id="passwordAlert">The password must be between 8 and 16 characters long and include uppercase letters, lowercase letters, numbers, and special characters.</div>
                 </div>
 
-                <div id="studentFields">
-                    <div class="form-group">
-                        <label>Program / Course</label>
-                        <select name="student_program" id="studentProgram" class="form-control" disabled onchange="onProgramChange()">
-                            <option value="">Select Program / Course</option>
-                            <?php if ($programs_result && $programs_result->num_rows > 0): ?>
-                                <?php while ($prog = $programs_result->fetch_assoc()): ?>
-                                    <option value="<?php echo $prog['id']; ?>"><?php echo htmlspecialchars($prog['program_name']); ?></option>
-                                <?php endwhile; ?>
-                            <?php endif; ?>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Year Level</label>
-                        <select name="student_year" id="studentYear" class="form-control" disabled onchange="onYearChange()">
-                            <option value="">Select Year Level</option>
-                            <option value="First Year">First Year</option>
-                            <option value="Second Year">Second Year</option>
-                            <option value="Third Year">Third Year</option>
-                            <option value="Fourth Year">Fourth Year</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Section</label>
-                        <select name="student_section" id="studentSection" class="form-control" disabled onchange="checkFormProgression()">
-                            <option value="">Select Section</option>
-                        </select>
-                    </div>
+                <div class="form-group">
+                    <label>Program / Course</label>
+                    <select name="student_program" id="studentProgram" class="form-control" required onchange="onProgramChange()">
+                        <option value="">Select Program / Course</option>
+                        <?php if ($programs_result && $programs_result->num_rows > 0): ?>
+                            <?php while ($prog = $programs_result->fetch_assoc()): ?>
+                                <option value="<?php echo $prog['id']; ?>"><?php echo htmlspecialchars($prog['program_name']); ?></option>
+                            <?php endwhile; ?>
+                        <?php endif; ?>
+                    </select>
                 </div>
 
-                <div id="teacherFields" style="display: none;">
-                    <div class="form-group">
-                        <label>Institute</label>
-                        <select name="teacher_institute" id="teacherInstitute" class="form-control" disabled onchange="onInstituteChange()">
-                            <option value="">Select Institute</option>
-                            <?php if (!empty($institutes_data)): ?>
-                                <?php foreach ($institutes_data as $inst): ?>
-                                    <option value="<?php echo htmlspecialchars($inst['institute_name']); ?>"><?php echo htmlspecialchars($inst['institute_name']); ?></option>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Position</label>
-                        <select name="teacher_position" id="teacherPosition" class="form-control" disabled onchange="checkFormProgression()">
-                            <option value="">Select Position</option>
-                            <option value="Institute Dean">Institute Dean</option>
-                            <option value="Institute Associate Dean">Institute Associate Dean</option>
-                            <option value="Associate Professor I">Associate Professor I</option>
-                            <option value="Associate Professor II">Associate Professor II</option>
-                            <option value="Associate Professor III">Associate Professor III</option>
-                            <option value="Assistant Professor I">Assistant Professor I</option>
-                            <option value="Assistant Professor II">Assistant Professor II</option>
-                            <option value="Assistant Professor III">Assistant Professor III</option>
-                        </select>
-                    </div>
+                <div class="form-group">
+                    <label>Year Level</label>
+                    <select name="student_year" id="studentYear" class="form-control" required onchange="onYearChange()">
+                        <option value="">Select Year Level</option>
+                        <option value="First Year">First Year</option>
+                        <option value="Second Year">Second Year</option>
+                        <option value="Third Year">Third Year</option>
+                        <option value="Fourth Year">Fourth Year</option>
+                    </select>
                 </div>
 
-                <button type="submit" class="btn-submit" id="submitBtn" disabled>Sign Up</button>
+                <div class="form-group">
+                    <label>Section</label>
+                    <select name="student_section" id="studentSection" class="form-control" required>
+                        <option value="">Select Section</option>
+                    </select>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" name="privacy_policy" id="privacyPolicy">
+                    <label for="privacyPolicy" style="margin-bottom:0; cursor:pointer;">I agree to the <a href="privacy_policy.php" target="_blank">Data Privacy Policy</a></label>
+                </div>
+
+                <button type="submit" class="btn-submit" id="submitBtn">Sign Up</button>
             </form>
 
             <div class="login-link">
-                <div>Already have an account? <a href="login.php">Log-in here</a> | <a href="privacy_policy.php" target="_blank">Data Privacy Policy</a></div>
+                <div>Already have an account? <a href="login.php">Log in here</a></div>
             </div>
         </div>
     </div>
 
     <script>
         const allSections = <?php echo json_encode($sections_data); ?>;
-        const takenPositionsByInstitute = <?php echo json_encode($taken_positions); ?>;
 
-        document.addEventListener('DOMContentLoaded', () => {
-            checkFormProgression();
-        });
-
-        function selectRole(role) {
-            document.getElementById('roleInput').value = role;
-            
-            document.querySelectorAll('.role-btn').forEach(btn => {
-                if (btn.getAttribute('data-role') === role) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
-            });
-
-            const studentFields = document.getElementById('studentFields');
-            const teacherFields = document.getElementById('teacherFields');
-            const idNumberLabel = document.getElementById('idNumberLabel');
-
-            if (role === 'student') {
-                studentFields.style.display = 'block';
-                teacherFields.style.display = 'none';
-                idNumberLabel.textContent = 'Student Number';
-            } else if (role === 'faculty') {
-                studentFields.style.display = 'none';
-                teacherFields.style.display = 'block';
-                idNumberLabel.textContent = 'Employee Number';
-            } else if (role === 'admin') {
-                studentFields.style.display = 'none';
-                teacherFields.style.display = 'none';
-                idNumberLabel.textContent = 'Admin ID Number';
+        function validateFirstName(input) {
+            const alertBox = document.getElementById('firstNameAlert');
+            const nameRegex = /^[A-ZÑa-zñ\-\s]+$/;
+            if (input.value.trim() !== "" && !nameRegex.test(input.value)) {
+                alertBox.style.display = 'block';
+            } else {
+                alertBox.style.display = 'none';
             }
-            checkFormProgression();
+        }
+
+        function validateMiddleName(input) {
+            const alertBox = document.getElementById('middleNameAlert');
+            const nameRegex = /^[A-ZÑa-zñ\-\s]+$/;
+            if (input.value.trim() !== "" && !nameRegex.test(input.value)) {
+                alertBox.style.display = 'block';
+            } else {
+                alertBox.style.display = 'none';
+            }
+        }
+
+        function validateLastName(input) {
+            const alertBox = document.getElementById('lastNameAlert');
+            const nameRegex = /^[A-ZÑa-zñ\-\s]+$/;
+            if (input.value.trim() !== "" && !nameRegex.test(input.value)) {
+                alertBox.style.display = 'block';
+            } else {
+                alertBox.style.display = 'none';
+            }
+        }
+
+        function validateIdNumber(input) {
+            const alertBox = document.getElementById('idNumberAlert');
+            const idRegex = /^\d{4}-\d{2}-\d{6}$/;
+            if (input.value.trim() !== "" && !idRegex.test(input.value)) {
+                alertBox.style.display = 'block';
+            } else {
+                alertBox.style.display = 'none';
+            }
+        }
+
+        function validateEmail(input) {
+            const alertBox = document.getElementById('emailAlert');
+            const emailRegex = /^[a-zA-Z0-9._%+-]+@kld\.edu\.ph$/;
+            if (input.value.trim() !== "" && !emailRegex.test(input.value.trim())) {
+                alertBox.style.display = 'block';
+            } else {
+                alertBox.style.display = 'none';
+            }
+        }
+
+        function validatePassword(input) {
+            const alertBox = document.getElementById('passwordAlert');
+            const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,16}$/;
+            if (input.value.trim() !== "" && !passwordRegex.test(input.value)) {
+                alertBox.style.display = 'block';
+            } else {
+                alertBox.style.display = 'none';
+            }
         }
 
         function onProgramChange() {
@@ -469,14 +445,6 @@ while ($row = $taken_res->fetch_assoc()) {
 
             yearSelect.value = "";
             sectionSelect.innerHTML = '<option value="">Select Section</option>';
-            sectionSelect.setAttribute('disabled', 'true');
-
-            if (programId !== "") {
-                yearSelect.removeAttribute('disabled');
-            } else {
-                yearSelect.setAttribute('disabled', 'true');
-            }
-            checkFormProgression();
         }
 
         function onYearChange() {
@@ -496,39 +464,13 @@ while ($row = $taken_res->fetch_assoc()) {
                         opt.textContent = sec.section_name;
                         sectionSelect.appendChild(opt);
                     });
-                    sectionSelect.removeAttribute('disabled');
                 } else {
                     const opt = document.createElement('option');
                     opt.value = "";
                     opt.textContent = "No sections found";
                     sectionSelect.appendChild(opt);
-                    sectionSelect.setAttribute('disabled', 'true');
-                }
-            } else {
-                sectionSelect.setAttribute('disabled', 'true');
-            }
-            checkFormProgression();
-        }
-
-        function onInstituteChange() {
-            const instituteSelect = document.getElementById('teacherInstitute');
-            const positionSelect = document.getElementById('teacherPosition');
-            const selectedInstitute = instituteSelect.value;
-
-            positionSelect.value = "";
-            for (let option of positionSelect.options) {
-                option.disabled = false;
-            }
-
-            if (selectedInstitute && takenPositionsByInstitute[selectedInstitute]) {
-                const taken = takenPositionsByInstitute[selectedInstitute];
-                for (let option of positionSelect.options) {
-                    if (taken.includes(option.value)) {
-                        option.disabled = true;
-                    }
                 }
             }
-            checkFormProgression();
         }
 
         function togglePasswordVisibility(fieldId, iconId) {
@@ -546,127 +488,52 @@ while ($row = $taken_res->fetch_assoc()) {
             }
         }
 
-        function checkFormProgression() {
-            const firstName = document.getElementById('firstName');
-            const middleName = document.getElementById('middleName');
-            const lastName = document.getElementById('lastName');
-            const roleButtons = document.querySelectorAll('.role-btn');
-            const idNumber = document.getElementById('idNumber');
-            const emailInput = document.getElementById('emailInput');
-            const passwordInput = document.getElementById('passwordInput');
-            const role = document.getElementById('roleInput').value;
+        function validateFormOnSubmit(event) {
+            const firstName = document.getElementById('firstName').value.trim();
+            const middleName = document.getElementById('middleName').value.trim();
+            const lastName = document.getElementById('lastName').value.trim();
+            const idNumber = document.getElementById('idNumber').value.trim();
+            const emailInput = document.getElementById('emailInput').value.trim();
+            const passwordInput = document.getElementById('passwordInput').value;
+            const studentProgram = document.getElementById('studentProgram').value;
+            const studentYear = document.getElementById('studentYear').value;
+            const studentSection = document.getElementById('studentSection').value;
+            const privacyPolicy = document.getElementById('privacyPolicy').checked;
             
-            const studentProgram = document.getElementById('studentProgram');
-            const studentYear = document.getElementById('studentYear');
-            const studentSection = document.getElementById('studentSection');
-            
-            const teacherInstitute = document.getElementById('teacherInstitute');
-            const teacherPosition = document.getElementById('teacherPosition');
-            const submitBtn = document.getElementById('submitBtn');
+            const clientErrorMsg = document.getElementById('clientErrorMsg');
+            const serverErrorMsg = document.getElementById('serverErrorMsg');
+            if (serverErrorMsg) serverErrorMsg.style.display = 'none';
 
-            if (firstName.value.trim() !== "") {
-                middleName.removeAttribute('disabled');
-            } else {
-                middleName.setAttribute('disabled', 'true');
-                middleName.value = "";
+            let errorMessage = "";
+
+            const nameRegex = /^[A-ZÑa-zñ\-\s]+$/;
+            const idRegex = /^\d{4}-\d{2}-\d{6}$/;
+            const emailRegex = /^[a-zA-Z0-9._%+-]+@kld\.edu\.ph$/;
+            const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,16}$/;
+
+            if (!nameRegex.test(firstName) || !nameRegex.test(middleName) || !nameRegex.test(lastName)) {
+                errorMessage = "All name fields must contain only letters, spaces, and hyphens.";
+            } else if (!idRegex.test(idNumber)) {
+                errorMessage = "The identification number must strictly follow the format: 202X-XX-XXXXXX.";
+            } else if (!emailRegex.test(emailInput)) {
+                errorMessage = "Only official KLD institutional email addresses (@kld.edu.ph) are accepted.";
+            } else if (!passwordRegex.test(passwordInput)) {
+                errorMessage = "The password must be between 8 and 16 characters long and include uppercase letters, lowercase letters, numbers, and special characters.";
+            } else if (!studentProgram || !studentYear || !studentSection) {
+                errorMessage = "Please complete all required fields for the student program, year level, and section.";
+            } else if (!privacyPolicy) {
+                errorMessage = "You must agree to the data privacy policy before proceeding.";
             }
 
-            if (middleName.value.trim() !== "") {
-                lastName.removeAttribute('disabled');
-            } else {
-                lastName.setAttribute('disabled', 'true');
-                lastName.value = "";
+            if (errorMessage !== "") {
+                event.preventDefault();
+                clientErrorMsg.textContent = errorMessage;
+                clientErrorMsg.style.display = 'block';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                return false;
             }
 
-            if (lastName.value.trim() !== "") {
-                roleButtons.forEach(btn => btn.removeAttribute('disabled'));
-            } else {
-                roleButtons.forEach(btn => btn.setAttribute('disabled', 'true'));
-            }
-
-            if (lastName.value.trim() !== "") {
-                idNumber.removeAttribute('disabled');
-            } else {
-                idNumber.setAttribute('disabled', 'true');
-                idNumber.value = "";
-            }
-
-            if (idNumber.value.trim() !== "") {
-                emailInput.removeAttribute('disabled');
-            } else {
-                emailInput.setAttribute('disabled', 'true');
-                emailInput.value = "";
-            }
-
-            if (emailInput.value.trim() !== "") {
-                passwordInput.removeAttribute('disabled');
-            } else {
-                passwordInput.setAttribute('disabled', 'true');
-                passwordInput.value = "";
-            }
-
-            let roleFieldsComplete = true;
-            if (passwordInput.value.trim() !== "") {
-                if (role === 'student') {
-                    studentProgram.removeAttribute('disabled');
-                    teacherInstitute.setAttribute('disabled', 'true');
-                    teacherPosition.setAttribute('disabled', 'true');
-                    if (studentProgram.value === "" || studentYear.value === "" || studentSection.value === "") {
-                        roleFieldsComplete = false;
-                    }
-                } else if (role === 'faculty') {
-                    teacherInstitute.removeAttribute('disabled');
-                    teacherPosition.removeAttribute('disabled');
-                    studentProgram.setAttribute('disabled', 'true');
-                    studentYear.setAttribute('disabled', 'true');
-                    studentSection.setAttribute('disabled', 'true');
-                    if (teacherInstitute.value === "" || teacherPosition.value === "") {
-                        roleFieldsComplete = false;
-                    }
-                } else {
-                    teacherInstitute.setAttribute('disabled', 'true');
-                    teacherPosition.setAttribute('disabled', 'true');
-                    studentProgram.setAttribute('disabled', 'true');
-                    studentYear.setAttribute('disabled', 'true');
-                    studentSection.setAttribute('disabled', 'true');
-                }
-            } else {
-                if (studentProgram) {
-                    studentProgram.setAttribute('disabled', 'true');
-                    studentProgram.value = "";
-                }
-                if (studentYear) {
-                    studentYear.setAttribute('disabled', 'true');
-                    studentYear.value = "";
-                }
-                if (studentSection) {
-                    studentSection.setAttribute('disabled', 'true');
-                    studentSection.innerHTML = '<option value="">Select Section</option>';
-                }
-                if (teacherInstitute) {
-                    teacherInstitute.setAttribute('disabled', 'true');
-                    teacherInstitute.value = "";
-                }
-                if (teacherPosition) {
-                    teacherPosition.setAttribute('disabled', 'true');
-                    teacherPosition.value = "";
-                }
-                roleFieldsComplete = false;
-            }
-
-            if (
-                firstName.value.trim() !== "" &&
-                middleName.value.trim() !== "" &&
-                lastName.value.trim() !== "" &&
-                idNumber.value.trim() !== "" &&
-                emailInput.value.trim() !== "" &&
-                passwordInput.value.trim() !== "" &&
-                roleFieldsComplete
-            ) {
-                submitBtn.removeAttribute('disabled');
-            } else {
-                submitBtn.setAttribute('disabled', 'true');
-            }
+            return true;
         }
     </script>
 </body>
