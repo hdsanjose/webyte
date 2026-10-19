@@ -977,6 +977,7 @@ $stmt_all_att->close();
 
     <script>
         let qrTimerInterval = null;
+        let qrStartTime = null; // Gagamitin para sa tumpak na pag-simula sa 00:00
 
         document.addEventListener("DOMContentLoaded", function() {
             const savedWidth = localStorage.getItem('kld_name_column_width');
@@ -1029,13 +1030,18 @@ $stmt_all_att->close();
                         correctLevel: QRCode.CorrectLevel.H
                     });
 
-                    document.getElementById('qrDisplayDate').textContent = data.date_generated;
+                    // Gamitin ang client-side local date para laging updated at tama ang lumabas na petsa
+                    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+                    const localFormattedDate = new Date().toLocaleDateString('en-US', options);
+
+                    document.getElementById('qrDisplayDate').textContent = localFormattedDate;
                     document.getElementById('qrDisplayUniqueId').textContent = data.unique_id;
 
                     document.getElementById('qrModal').style.display = 'flex';
 
-                    // Simulan ang live timer
-                    startQRTimer(data.generated_timestamp);
+                    // Itala ang eksaktong oras ng pag-bukas ng QR para magsimula sa 00:00
+                    qrStartTime = Date.now();
+                    startQRTimer();
                 } else {
                     alert('Error: ' + (data.message || 'Unable to generate QR Code.'));
                 }
@@ -1046,7 +1052,7 @@ $stmt_all_att->close();
             });
         }
 
-        function startQRTimer(generatedTimestamp) {
+        function startQRTimer() {
             if (qrTimerInterval) clearInterval(qrTimerInterval);
 
             const timerText = document.getElementById('qrTimerText');
@@ -1054,8 +1060,8 @@ $stmt_all_att->close();
             const timerBox = document.getElementById('qrTimerBox');
 
             function updateTimer() {
-                const now = Math.floor(Date.now() / 1000);
-                const elapsedSeconds = now - generatedTimestamp;
+                const now = Date.now();
+                const elapsedSeconds = Math.floor((now - qrStartTime) / 1000);
 
                 const minutes = Math.floor(elapsedSeconds / 60);
                 const seconds = elapsedSeconds % 60;
@@ -1063,7 +1069,7 @@ $stmt_all_att->close();
                 const formattedTime = String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
                 timerText.textContent = formattedTime;
 
-                // Kulay at Status logic
+                // Kulay at Status logic:
                 // 00:00 - 10:00 (0 hanggang 600 segundo) = PRESENT (Green)
                 // 10:01 - 15:00 (601 hanggang 900 segundo) = LATE (Orange)
                 // 15:01 onwards (901 segundo pataas) = ABSENT (Red)
