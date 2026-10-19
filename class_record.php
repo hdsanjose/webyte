@@ -2,7 +2,7 @@
 session_start();
 require_once 'db_connect.php';
 
-// Allow both admin and faculty roles[cite: 6]
+// Allow both admin and faculty roles
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'faculty'])) {
     header("Location: login.php");
     exit();
@@ -10,7 +10,7 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'facu
 
 $teacher_subject_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
-// Fetch teacher_subjects record[cite: 6]
+// Fetch teacher_subjects record
 $stmt_subj = $conn->prepare("SELECT * FROM teacher_subjects WHERE id = ?");
 $stmt_subj->bind_param("i", $teacher_subject_id);
 $stmt_subj->execute();
@@ -25,7 +25,7 @@ $stmt_subj->close();
 
 $teacher_id = $subject['teacher_id'];
 
-// If logged in as faculty, ensure they only view their own subjects[cite: 6]
+// If logged in as faculty, ensure they only view their own subjects
 if ($_SESSION['role'] === 'faculty' && $teacher_id != $_SESSION['user_id']) {
     header("Location: teacher_dashboard.php");
     exit();
@@ -39,9 +39,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
     header('Content-Type: application/json');
     
-    $qr_code_payload = "ATTENDANCE_SUBJ_" . $teacher_subject_id . "_" . time() . "_" . rand(1000, 9999);
+    // Bumuo ng 10-digits unique ID at kunin ang kasalukuyang timestamp at petsa
+    $unique_10_digit_id = mt_rand(1000000000, 9999999999);
+    $current_date = date('Y-m-d');
+    $current_timestamp = time();
+
+    // Payload format: ATTENDANCE_SUBJ_[ID]_[UNIQUE_10_DIGITS]_[TIMESTAMP]_[DATE]
+    $qr_code_payload = "ATTENDANCE_SUBJ_" . $teacher_subject_id . "_" . $unique_10_digit_id . "_" . $current_timestamp . "_" . $current_date;
     
-    echo json_encode(['success' => true, 'qr_code' => $qr_code_payload]);
+    echo json_encode([
+        'success' => true, 
+        'qr_code' => $qr_code_payload,
+        'unique_id' => $unique_10_digit_id,
+        'date_generated' => date('F j, Y'),
+        'generated_timestamp' => $current_timestamp
+    ]);
     exit();
 }
 
@@ -452,7 +464,7 @@ $stmt_all_att->close();
         }
 
         .qr-modal-content {
-            max-width: 350px;
+            max-width: 380px;
             height: auto;
             border-radius: 12px;
             padding: 24px;
@@ -484,6 +496,19 @@ $stmt_all_att->close();
             border-radius: 8px;
             padding: 5px;
         }
+
+        /* Styling para sa timer status badge sa QR modal */
+        .qr-timer-box {
+            margin-top: 12px;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 13px;
+            transition: all 0.3s ease;
+        }
+        .timer-green { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .timer-orange { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        .timer-red { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
 
         .att-modal-top-header {
             display: flex;
@@ -817,9 +842,17 @@ $stmt_all_att->close();
         <div class="qr-modal-content">
             <span class="qr-modal-close" onclick="closeQRModal()">&times;</span>
             <h3 style="margin-top: 0; color: #1a331e;">Class Attendance QR Code</h3>
-            <p style="font-size: 12px; color: #666;">I-scan ng mga estudyante para ma-record ang attendance ngayong araw.</p>
+            <p style="font-size: 12px; color: #666; margin-bottom: 5px;">I-scan ng mga estudyante para ma-record ang attendance.</p>
+            
+            <div style="font-size: 11px; color: #444; margin-bottom: 8px;">
+                Date: <strong id="qrDisplayDate"></strong> | Unique ID: <strong id="qrDisplayUniqueId"></strong>
+            </div>
+
             <div id="qrcode"></div>
-            <p style="font-size: 11px; color: #888;">Petsa: <strong><?php echo date('F j, Y'); ?></strong></p>
+
+            <div id="qrTimerBox" class="qr-timer-box timer-green">
+                <i class="fa-solid fa-clock"></i> Time Elapsed: <span id="qrTimerText">00:00</span> — <span id="qrStatusText">PRESENT</span>
+            </div>
         </div>
     </div>
 
@@ -943,6 +976,8 @@ $stmt_all_att->close();
     </main>
 
     <script>
+        let qrTimerInterval = null;
+
         document.addEventListener("DOMContentLoaded", function() {
             const savedWidth = localStorage.getItem('kld_name_column_width');
             if (savedWidth) {
@@ -994,7 +1029,13 @@ $stmt_all_att->close();
                         correctLevel: QRCode.CorrectLevel.H
                     });
 
+                    document.getElementById('qrDisplayDate').textContent = data.date_generated;
+                    document.getElementById('qrDisplayUniqueId').textContent = data.unique_id;
+
                     document.getElementById('qrModal').style.display = 'flex';
+
+                    // Simulan ang live timer
+                    startQRTimer(data.generated_timestamp);
                 } else {
                     alert('Error: ' + (data.message || 'Unable to generate QR Code.'));
                 }
@@ -1005,7 +1046,45 @@ $stmt_all_att->close();
             });
         }
 
+        function startQRTimer(generatedTimestamp) {
+            if (qrTimerInterval) clearInterval(qrTimerInterval);
+
+            const timerText = document.getElementById('qrTimerText');
+            const statusText = document.getElementById('qrStatusText');
+            const timerBox = document.getElementById('qrTimerBox');
+
+            function updateTimer() {
+                const now = Math.floor(Date.now() / 1000);
+                const elapsedSeconds = now - generatedTimestamp;
+
+                const minutes = Math.floor(elapsedSeconds / 60);
+                const seconds = elapsedSeconds % 60;
+
+                const formattedTime = String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+                timerText.textContent = formattedTime;
+
+                // Kulay at Status logic
+                // 00:00 - 10:00 (0 hanggang 600 segundo) = PRESENT (Green)
+                // 10:01 - 15:00 (601 hanggang 900 segundo) = LATE (Orange)
+                // 15:01 onwards (901 segundo pataas) = ABSENT (Red)
+                if (elapsedSeconds <= 600) {
+                    timerBox.className = "qr-timer-box timer-green";
+                    statusText.textContent = "PRESENT";
+                } else if (elapsedSeconds <= 900) {
+                    timerBox.className = "qr-timer-box timer-orange";
+                    statusText.textContent = "LATE";
+                } else {
+                    timerBox.className = "qr-timer-box timer-red";
+                    statusText.textContent = "ABSENT";
+                }
+            }
+
+            updateTimer();
+            qrTimerInterval = setInterval(updateTimer, 1000);
+        }
+
         function closeQRModal() {
+            if (qrTimerInterval) clearInterval(qrTimerInterval);
             document.getElementById('qrModal').style.display = 'none';
         }
 
